@@ -791,7 +791,7 @@ func (mux *abciMux) EndBlock(req types.RequestEndBlock) types.ResponseEndBlock {
 	resp.Events = ctx.GetEvents()
 
 	// Update version to what we are actually running.
-	resp.ConsensusParamUpdates = &types.ConsensusParams{
+	resp.ConsensusParamUpdates = &tmproto.ConsensusParams{
 		Version: &tmproto.VersionParams{
 			AppVersion: version.TendermintAppVersion,
 		},

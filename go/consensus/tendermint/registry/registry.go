@@ -10,7 +10,7 @@ import (
 	"github.com/hashicorp/go-multierror"
 	tmabcitypes "github.com/tendermint/tendermint/abci/types"
 	tmpubsub "github.com/tendermint/tendermint/libs/pubsub"
-	tmrpctypes "github.com/tendermint/tendermint/rpc/core/types"
+	tmrpctypes "github.com/tendermint/tendermint/rpc/coretypes"
 	tmtypes "github.com/tendermint/tendermint/types"
 
 	"github.com/oasisprotocol/oasis-core/go/common/cbor"

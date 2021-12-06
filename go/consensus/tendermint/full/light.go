@@ -40,6 +40,11 @@ func (t *fullService) GetLightBlock(ctx context.Context, height int64) (*consens
 	if err != nil {
 		return nil, fmt.Errorf("tendermint: failed to convert light block: %w", err)
 	}
+
+	// This workaround is needed because of:
+	// https://github.com/tendermint/tendermint/commit/5bafedff17f4bbeb915df79d4bef74d6a635825a#diff-c4a5571b309cf76086cc8f6614c957ba58f9abec7ada7088fc74dd1d2a5d7d3c
+	protoLb.ValidatorSet.TotalVotingPower = lb.ValidatorSet.TotalVotingPower()
+
 	meta, err := protoLb.Marshal()
 	if err != nil {
 		return nil, fmt.Errorf("tendermint: failed to marshal light block: %w", err)
@@ -65,7 +70,9 @@ func (t *fullService) GetParameters(ctx context.Context, height int64) (*consens
 	if err != nil {
 		return nil, fmt.Errorf("%w: tendermint: consensus params query failed: %s", consensusAPI.ErrVersionNotFound, err.Error())
 	}
-	meta, err := params.ConsensusParams.Marshal()
+	conParams := params.ConsensusParams
+	conParamsPb := conParams.ToProto()
+	meta, err := conParamsPb.Marshal()
 	if err != nil {
 		return nil, fmt.Errorf("tendermint: failed to marshal consensus params: %w", err)
 	}

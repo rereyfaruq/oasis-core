@@ -10,9 +10,8 @@ import (
 	"github.com/tendermint/tendermint/abci/types"
 	tmpubsub "github.com/tendermint/tendermint/libs/pubsub"
 	tmquery "github.com/tendermint/tendermint/libs/pubsub/query"
-	tmp2p "github.com/tendermint/tendermint/p2p"
 	tmcrypto "github.com/tendermint/tendermint/proto/tendermint/crypto"
-	tmrpctypes "github.com/tendermint/tendermint/rpc/core/types"
+	tmrpctypes "github.com/tendermint/tendermint/rpc/coretypes"
 	tmtypes "github.com/tendermint/tendermint/types"
 
 	"github.com/oasisprotocol/oasis-core/go/common/cbor"
@@ -52,7 +51,7 @@ func PublicKeyToValidatorUpdate(id signature.PublicKey, power int64) types.Valid
 
 // NodeToP2PAddr converts an Oasis node descriptor to a tendermint p2p
 // address book entry.
-func NodeToP2PAddr(n *node.Node) (*tmp2p.NetAddress, error) {
+func NodeToP2PAddr(n *node.Node) (*tmtypes.NetAddress, error) {
 	// WARNING: p2p/transport.go:MultiplexTransport.upgrade() uses
 	// a case sensitive string comparison to validate public keys,
 	// because tendermint.
@@ -76,7 +75,7 @@ func NodeToP2PAddr(n *node.Node) (*tmp2p.NetAddress, error) {
 
 	addr := pubKeyAddrHex + "@" + string(coreAddress)
 
-	tmAddr, err := tmp2p.NewNetAddressString(addr)
+	tmAddr, err := tmtypes.NewNetAddressString(addr)
 	if err != nil {
 		return nil, fmt.Errorf("tendermint/api: failed to reformat validator: %w", err)
 	}
