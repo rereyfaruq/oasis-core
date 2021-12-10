@@ -296,7 +296,11 @@ func (c *Context) HasEvent(evType string, key []byte) bool {
 		}
 
 		for _, pair := range ev.Attributes {
-			if bytes.Equal(pair.GetKey(), key) {
+			pk, err := DecodeEventKV(pair.GetKey())
+			if err != nil {
+				continue
+			}
+			if bytes.Equal(pk, key) {
 				return true
 			}
 		}

@@ -285,8 +285,10 @@ func EventsFromTendermint(
 		}
 
 		for _, pair := range tmEv.GetAttributes() {
-			key := pair.GetKey()
-			val := pair.GetValue()
+			key, val, err := tmapi.DecodeEventKVPair(pair.GetKey(), pair.GetValue())
+			if err != nil {
+				return nil, nil, err
+			}
 
 			switch {
 			case bytes.Equal(key, app.KeyRegistryNodeListEpoch):

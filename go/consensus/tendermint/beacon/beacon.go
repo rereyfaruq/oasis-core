@@ -284,8 +284,10 @@ func (sc *serviceClient) DeliverBlock(ctx context.Context, height int64) error {
 
 func (sc *serviceClient) DeliverEvent(ctx context.Context, height int64, tx tmtypes.Tx, ev *tmabcitypes.Event) error {
 	for _, pair := range ev.GetAttributes() {
-		key := pair.GetKey()
-		val := pair.GetValue()
+		key, val, err := tmAPI.DecodeEventKVPair(pair.GetKey(), pair.GetValue())
+		if err != nil {
+			return err
+		}
 
 		if bytes.Equal(key, app.KeyEpoch) {
 			var epoch beaconAPI.EpochTime

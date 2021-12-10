@@ -284,17 +284,20 @@ func TestRewardAndSlash(t *testing.T) {
 		require.Equal(abciAPI.EventTypeForApp(AppName), ev.Type, "all emitted events should be staking events")
 		require.Len(ev.Attributes, 1, "each event should have a single attribute")
 
-		switch string(ev.Attributes[0].Key) {
+		key, val, err := abciAPI.DecodeEventKVPair(ev.Attributes[0].Key, ev.Attributes[0].Value)
+		require.NoError(err, "malformed event value")
+
+		switch string(key) {
 		case "add_escrow":
 			var v staking.AddEscrowEvent
-			err = cbor.Unmarshal(ev.Attributes[0].Value, &v)
+			err = cbor.Unmarshal(val, &v)
 			require.NoError(err, "malformed add escrow event")
 		case "transfer":
 			var v staking.TransferEvent
-			err = cbor.Unmarshal(ev.Attributes[0].Value, &v)
+			err = cbor.Unmarshal(val, &v)
 			require.NoError(err, "malformed add escrow event")
 		default:
-			t.Fatalf("unexpected event key: %+v", ev.Attributes[0].Key)
+			t.Fatalf("unexpected event key: %+v", key)
 		}
 	}
 	require.Equal("add_escrow", string(evs[0].Attributes[0].Key), "first event should be an add escrow event")
@@ -370,17 +373,20 @@ func TestRewardAndSlash(t *testing.T) {
 		require.Equal(abciAPI.EventTypeForApp(AppName), ev.Type, "all emitted events should be staking events")
 		require.Len(ev.Attributes, 1, "each event should have a single attribute")
 
-		switch string(ev.Attributes[0].Key) {
+		key, val, err := abciAPI.DecodeEventKVPair(ev.Attributes[0].Key, ev.Attributes[0].Value)
+		require.NoError(err, "malformed event value")
+
+		switch string(key) {
 		case "add_escrow":
 			var v staking.AddEscrowEvent
-			err = cbor.Unmarshal(ev.Attributes[0].Value, &v)
+			err = cbor.Unmarshal(val, &v)
 			require.NoError(err, "malformed add escrow event")
 		case "transfer":
 			var v staking.TransferEvent
-			err = cbor.Unmarshal(ev.Attributes[0].Value, &v)
+			err = cbor.Unmarshal(val, &v)
 			require.NoError(err, "malformed add escrow event")
 		default:
-			t.Fatalf("unexpected event key: %+v", ev.Attributes[0].Key)
+			t.Fatalf("unexpected event key: %+v", key)
 		}
 	}
 	require.Equal("add_escrow", string(evs[0].Attributes[0].Key), "first event should be an add escrow event")

@@ -408,9 +408,14 @@ func (sc *serviceClient) reindexBlocks(currentHeight int64, bh api.BlockHistory)
 			}
 
 			for _, pair := range tmEv.GetAttributes() {
-				if bytes.Equal(pair.GetKey(), app.KeyFinalized) {
+				key, val, err := tmapi.DecodeEventKVPair(pair.GetKey(), pair.GetValue())
+				if err != nil {
+					return 0, err
+				}
+
+				if bytes.Equal(key, app.KeyFinalized) {
 					var value app.ValueFinalized
-					if err = cbor.Unmarshal(pair.GetValue(), &value); err != nil {
+					if err = cbor.Unmarshal(val, &value); err != nil {
 						logger.Error("failed to unmarshal finalized event",
 							"err", err,
 							"height", height,
@@ -672,8 +677,10 @@ func EventsFromTendermint(
 		}
 
 		for _, pair := range tmEv.GetAttributes() {
-			key := pair.GetKey()
-			val := pair.GetValue()
+			key, val, err := tmapi.DecodeEventKVPair(pair.GetKey(), pair.GetValue())
+			if err != nil {
+				return nil, err
+			}
 
 			switch {
 			case bytes.Equal(key, app.KeyFinalized):

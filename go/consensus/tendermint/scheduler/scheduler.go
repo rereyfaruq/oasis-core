@@ -109,9 +109,14 @@ func (sc *serviceClient) ServiceDescriptor() tmapi.ServiceDescriptor {
 // Implements api.ServiceClient.
 func (sc *serviceClient) DeliverEvent(ctx context.Context, height int64, tx tmtypes.Tx, ev *tmabcitypes.Event) error {
 	for _, pair := range ev.GetAttributes() {
-		if bytes.Equal(pair.GetKey(), app.KeyElected) {
+		key, val, err := tmapi.DecodeEventKVPair(pair.GetKey(), pair.GetValue())
+		if err != nil {
+			return err
+		}
+
+		if bytes.Equal(key, app.KeyElected) {
 			var kinds []api.CommitteeKind
-			if err := cbor.Unmarshal(pair.GetValue(), &kinds); err != nil {
+			if err := cbor.Unmarshal(val, &kinds); err != nil {
 				sc.logger.Error("worker: malformed elected committee types list",
 					"err", err,
 				)
