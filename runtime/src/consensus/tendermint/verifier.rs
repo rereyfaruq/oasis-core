@@ -4,7 +4,7 @@ use std::{
     convert::{TryFrom, TryInto},
     str::FromStr,
     sync::Arc,
-    time::{Duration, SystemTime},
+    time::Duration,
 };
 
 use anyhow::anyhow;
@@ -539,21 +539,17 @@ impl Io {
                 Context::background(),
                 Body::HostFetchConsensusBlockRequest { height },
             )
-            .map_err(|err| IoError::rpc(RpcError::client_internal(err.to_string())))?;
+            .map_err(|err| IoError::rpc(RpcError::server(err.to_string())))?;
 
         // Extract generic light block from response.
         let block = match result {
             Body::HostFetchConsensusBlockResponse { block } => block,
-            _ => {
-                return Err(IoError::rpc(RpcError::client_internal(
-                    "bad response".to_string(),
-                )))
-            }
+            _ => return Err(IoError::rpc(RpcError::server("bad response".to_string()))),
         };
 
         // Decode block as a Tendermint light block.
         let block = decode_light_block(block)
-            .map_err(|err| IoError::rpc(RpcError::client_internal(err.to_string())))?;
+            .map_err(|err| IoError::rpc(RpcError::server(err.to_string())))?;
 
         Ok(block)
     }
@@ -578,11 +574,9 @@ impl components::io::Io for Io {
         let next_block = Io::fetch_light_block(self, height + 1)?;
 
         Ok(TMLightBlock {
-            signed_header: block
-                .signed_header
-                .ok_or(IoError::rpc(RpcError::client_internal(
-                    "missing signed header".to_string(),
-                )))?,
+            signed_header: block.signed_header.ok_or(IoError::rpc(RpcError::server(
+                "missing signed header".to_string(),
+            )))?,
             validators: block.validators,
             next_validators: next_block.validators,
             provider: PeerId::new([0; 20]),
@@ -594,10 +588,7 @@ struct InsecureClock;
 
 impl components::clock::Clock for InsecureClock {
     fn now(&self) -> Time {
-        let kludge = time::insecure_posix_system_time()
-            .duration_since(SystemTime::UNIX_EPOCH)
-            .unwrap();
-        Time::from_unix_timestamp(kludge.as_secs() as i64, kludge.subsec_nanos()).unwrap()
+        Time(time::insecure_posix_system_time().into())
     }
 }
 
