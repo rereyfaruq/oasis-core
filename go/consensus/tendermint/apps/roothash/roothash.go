@@ -372,6 +372,13 @@ func (app *rootHashApplication) ExecuteTx(ctx *tmapi.Context, tx *transaction.Tr
 		}
 
 		return app.submitEvidence(ctx, state, &ev)
+	case roothash.MethodSubmitMsg:
+		var msg roothash.SubmitMsg
+		if err := cbor.Unmarshal(tx.Body, &msg); err != nil {
+			return err
+		}
+
+		return app.submitMsg(ctx, state, &msg)
 	default:
 		return roothash.ErrInvalidArgument
 	}

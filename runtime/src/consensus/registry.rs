@@ -62,6 +62,9 @@ pub struct TxnSchedulerParameters {
     pub max_batch_size: u64,
     /// Maximum size of a scheduled batch in bytes.
     pub max_batch_size_bytes: u64,
+    /// Maximum size of the incoming message queue.
+    #[cbor(optional, default, skip_serializing_if = "num_traits::Zero::is_zero")]
+    pub max_in_messages: u32,
     /// Timeout (in consensus blocks) for the scheduler to propose a batch.
     pub propose_batch_timeout: i64,
 }

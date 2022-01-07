@@ -10,7 +10,10 @@ use oasis_core_keymanager_client::KeyManagerClient;
 use oasis_core_runtime::{
     common::version::Version,
     config::Config,
-    consensus::{roothash::Message, verifier::TrustRoot},
+    consensus::{
+        roothash::{IncomingMessage, Message},
+        verifier::TrustRoot,
+    },
     protocol::HostInfo,
     rak::RAK,
     transaction::{
@@ -205,6 +208,7 @@ impl TxnDispatcher for Dispatcher {
         &self,
         mut ctx: TxnContext,
         batch: &TxnBatch,
+        in_msgs: &[IncomingMessage],
     ) -> Result<ExecuteBatchResult, RuntimeError> {
         let mut ctx = Context {
             core: &mut ctx,
@@ -223,6 +227,7 @@ impl TxnDispatcher for Dispatcher {
         Ok(ExecuteBatchResult {
             results,
             messages: ctx.messages,
+            in_msgs_count: in_msgs.len(),
             block_tags: vec![],
             batch_weight_limits: None,
         })

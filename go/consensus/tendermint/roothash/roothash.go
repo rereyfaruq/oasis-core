@@ -25,6 +25,7 @@ import (
 	app "github.com/oasisprotocol/oasis-core/go/consensus/tendermint/apps/roothash"
 	"github.com/oasisprotocol/oasis-core/go/roothash/api"
 	"github.com/oasisprotocol/oasis-core/go/roothash/api/block"
+	"github.com/oasisprotocol/oasis-core/go/roothash/api/message"
 	runtimeRegistry "github.com/oasisprotocol/oasis-core/go/runtime/registry"
 )
 
@@ -141,6 +142,26 @@ func (sc *serviceClient) GetLastRoundResults(ctx context.Context, request *api.R
 	}
 
 	return q.LastRoundResults(ctx, request.RuntimeID)
+}
+
+// Implements api.Backend.
+func (sc *serviceClient) GetIncomingMessageQueueMeta(ctx context.Context, request *api.RuntimeRequest) (*message.IncomingMessageQueueMeta, error) {
+	q, err := sc.querier.QueryAt(ctx, request.Height)
+	if err != nil {
+		return nil, err
+	}
+
+	return q.IncomingMessageQueueMeta(ctx, request.RuntimeID)
+}
+
+// Implements api.Backend.
+func (sc *serviceClient) GetIncomingMessageQueue(ctx context.Context, request *api.InMessageQueueRequest) ([]*message.IncomingMessage, error) {
+	q, err := sc.querier.QueryAt(ctx, request.Height)
+	if err != nil {
+		return nil, err
+	}
+
+	return q.IncomingMessageQueue(ctx, request.RuntimeID, request.Offset, request.Limit)
 }
 
 // Implements api.Backend.

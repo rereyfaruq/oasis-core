@@ -659,6 +659,17 @@ func (n *Node) handleScheduleBatch(force bool) {
 		)
 	}
 
+	// Fetch incoming message queue metadata to see if there's any queued messages.
+	inMsgMeta, err := n.commonNode.Consensus.RootHash().GetIncomingMessageQueueMeta(roundCtx, &roothash.RuntimeRequest{
+		RuntimeID: n.commonNode.Runtime.ID(),
+		Height:    lb.Height,
+	})
+	if err != nil {
+		n.logger.Error("failed to fetch incoming runtime message queue metadata",
+			"err", err,
+		)
+	}
+
 	// Ask the scheduler to get a batch of transactions for us and see if we should be proposing
 	// a new batch to other nodes.
 	batch := n.commonNode.TxPool.GetScheduledBatch(force)
@@ -667,6 +678,8 @@ func (n *Node) handleScheduleBatch(force bool) {
 		// We have some transactions, schedule batch.
 	case force && len(roundResults.Messages) > 0:
 		// We have runtime message results (and batch timeout expired), schedule batch.
+	case force && inMsgMeta.Size > 0:
+		// We have queued incoming runtime messages (and batch timeout expired), schedule batch.
 	case rtState.LastNormalRound == rtState.GenesisBlock.Header.Round:
 		// This is the runtime genesis, schedule batch.
 	case force && rtState.LastNormalHeight < epoch.GetEpochHeight():
@@ -1023,12 +1036,25 @@ func (n *Node) startProcessingBatchLocked(batch *unresolvedBatch) {
 		// Optionally start local storage replication in parallel to batch dispatch.
 		replicateCh := n.startLocalStorageReplication(ctx, blk, batch.hash(), resolvedBatch)
 
+		// Fetch any incoming messages.
+		inMsgs, err := n.commonNode.Consensus.RootHash().GetIncomingMessageQueue(ctx, &roothash.InMessageQueueRequest{
+			RuntimeID: n.commonNode.Runtime.ID(),
+			Height:    height,
+		})
+		if err != nil {
+			n.logger.Error("failed to fetch incoming runtime message queue metadata",
+				"err", err,
+			)
+			return
+		}
+
 		rq := &protocol.Body{
 			RuntimeExecuteTxBatchRequest: &protocol.RuntimeExecuteTxBatchRequest{
 				ConsensusBlock: *consensusBlk,
 				RoundResults:   roundResults,
 				IORoot:         batch.hash(),
 				Inputs:         resolvedBatch,
+				InMessages:     inMsgs,
 				Block:          *blk,
 				Epoch:          epoch,
 				MaxMessages:    state.Runtime.Executor.MaxMessages,

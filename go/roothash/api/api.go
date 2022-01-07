@@ -12,11 +12,13 @@ import (
 	"github.com/oasisprotocol/oasis-core/go/common/errors"
 	"github.com/oasisprotocol/oasis-core/go/common/logging"
 	"github.com/oasisprotocol/oasis-core/go/common/pubsub"
+	"github.com/oasisprotocol/oasis-core/go/common/quantity"
 	"github.com/oasisprotocol/oasis-core/go/consensus/api/transaction"
 	"github.com/oasisprotocol/oasis-core/go/oasis-node/cmd/common/flags"
 	registry "github.com/oasisprotocol/oasis-core/go/registry/api"
 	"github.com/oasisprotocol/oasis-core/go/roothash/api/block"
 	"github.com/oasisprotocol/oasis-core/go/roothash/api/commitment"
+	"github.com/oasisprotocol/oasis-core/go/roothash/api/message"
 )
 
 const (
@@ -70,8 +72,15 @@ var (
 	// ErrDuplicateEvidence is the error returned when submitting already existing evidence.
 	ErrDuplicateEvidence = errors.New(ModuleName, 9, "roothash: duplicate evidence")
 
-	// ErrInvalidEvidence is the error return when an invalid evidence is submitted.
+	// ErrInvalidEvidence is the error returned when an invalid evidence is submitted.
 	ErrInvalidEvidence = errors.New(ModuleName, 10, "roothash: invalid evidence")
+
+	// ErrIncomingMessageQueueFull is the error returned when the incoming message queue is full.
+	ErrIncomingMessageQueueFull = errors.New(ModuleName, 11, "roothash: incoming message queue full")
+
+	// ErrIncomingMessageInsufficientFee is the error returned when the provided fee is smaller than
+	// the configured minimum incoming message submission fee.
+	ErrIncomingMessageInsufficientFee = errors.New(ModuleName, 12, "roothash: insufficient fee")
 
 	// MethodExecutorCommit is the method name for executor commit submission.
 	MethodExecutorCommit = transaction.NewMethodName(ModuleName, "ExecutorCommit", ExecutorCommit{})
@@ -82,11 +91,15 @@ var (
 	// MethodEvidence is the method name for submitting evidence of node misbehavior.
 	MethodEvidence = transaction.NewMethodName(ModuleName, "Evidence", Evidence{})
 
+	// MethodSubmitMsg is the method name for queuing incoming runtime messages.
+	MethodSubmitMsg = transaction.NewMethodName(ModuleName, "SubmitMsg", SubmitMsg{})
+
 	// Methods is a list of all methods supported by the roothash backend.
 	Methods = []transaction.MethodName{
 		MethodExecutorCommit,
 		MethodExecutorProposerTimeout,
 		MethodEvidence,
+		MethodSubmitMsg,
 	}
 )
 
@@ -106,6 +119,12 @@ type Backend interface {
 
 	// GetLastRoundResults returns the given runtime's last normal round results.
 	GetLastRoundResults(ctx context.Context, request *RuntimeRequest) (*RoundResults, error)
+
+	// GetIncomingMessageQueueMeta returns the given runtime's incoming message queue metadata.
+	GetIncomingMessageQueueMeta(ctx context.Context, request *RuntimeRequest) (*message.IncomingMessageQueueMeta, error)
+
+	// GetIncomingMessageQueue returns the given runtime's queued incoming messages.
+	GetIncomingMessageQueue(ctx context.Context, request *InMessageQueueRequest) ([]*message.IncomingMessage, error)
 
 	// WatchBlocks returns a channel that produces a stream of
 	// annotated blocks.
@@ -140,6 +159,15 @@ type RuntimeRequest struct {
 	Height    int64            `json:"height"`
 }
 
+// InMessageQueueRequest is a request for queued incoming messages.
+type InMessageQueueRequest struct {
+	RuntimeID common.Namespace `json:"runtime_id"`
+	Height    int64            `json:"height"`
+
+	Offset uint64 `json:"offset,omitempty"`
+	Limit  uint32 `json:"limit,omitempty"`
+}
+
 // ExecutorCommit is the argument set for the ExecutorCommit method.
 type ExecutorCommit struct {
 	ID      common.Namespace                `json:"id"`
@@ -166,6 +194,19 @@ func NewRequestProposerTimeoutTx(nonce uint64, fee *transaction.Fee, runtimeID c
 		ID:    runtimeID,
 		Round: round,
 	})
+}
+
+// SubmitMsg is the argument set for the SubmitMsg method.
+type SubmitMsg struct {
+	ID     common.Namespace  `json:"id"`
+	Fee    quantity.Quantity `json:"fee,omitempty"`
+	Tokens quantity.Quantity `json:"tokens,omitempty"`
+	Data   []byte            `json:"data,omitempty"`
+}
+
+// NewSubmitMsgTx creates a new incoming runtime message submission transaction.
+func NewSubmitMsgTx(nonce uint64, fee *transaction.Fee, msg *SubmitMsg) *transaction.Transaction {
+	return transaction.NewTransaction(nonce, fee, MethodSubmitMsg, msg)
 }
 
 // EvidenceKind is the evidence kind.
@@ -448,6 +489,9 @@ const (
 
 	// GasOpEvidence is the gas operation identifier for evidence submission transaction cost.
 	GasOpEvidence transaction.Op = "evidence"
+
+	// GasOpSubmitMsg is the gas operation identifier for message submission transaction cost.
+	GasOpSubmitMsg transaction.Op = "submit_msg"
 )
 
 // XXX: Define reasonable default gas costs.
@@ -457,6 +501,7 @@ var DefaultGasCosts = transaction.Costs{
 	GasOpComputeCommit:   1000,
 	GasOpProposerTimeout: 1000,
 	GasOpEvidence:        1000,
+	GasOpSubmitMsg:       1000,
 }
 
 // SanityCheckBlocks examines the blocks table.
