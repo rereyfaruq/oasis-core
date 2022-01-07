@@ -146,3 +146,55 @@ func TestChildContext(t *testing.T) {
 	require.False(ctx.IsMessageExecution(), "parent should not have message execution enabled")
 	child.Close()
 }
+
+func TestTransactionContext(t *testing.T) {
+	require := require.New(t)
+
+	now := time.Unix(1580461674, 0)
+	appState := NewMockApplicationState(&MockApplicationStateConfig{})
+	ctx := appState.NewContext(ContextDeliverTx, now)
+	defer ctx.Close()
+
+	child := ctx.NewTransaction()
+
+	// Emitted events and state updates should not propagate to the parent unless committed.
+	child.EmitEvent(NewEventBuilder("test").Attribute([]byte("foo"), []byte("bar")))
+	require.Len(child.GetEvents(), 1, "child event should be stored")
+	require.Len(ctx.GetEvents(), 0, "child event should not immediately propagate")
+
+	tree := child.State()
+	err := tree.Insert(ctx, []byte("key"), []byte("value"))
+	require.NoError(err, "Insert")
+
+	child.Close()
+	require.Len(ctx.GetEvents(), 0, "child event should not propagate unless committed")
+
+	tree = ctx.State()
+	value, err := tree.Get(ctx, []byte("key"))
+	require.NoError(err, "Get")
+	require.EqualValues([]byte(nil), value, "state updates should not propagate unless committed")
+
+	// Emitted events and state updates should propagate if committed.
+	ctx = appState.NewContext(ContextDeliverTx, now)
+	defer ctx.Close()
+
+	child = ctx.NewTransaction()
+
+	child.EmitEvent(NewEventBuilder("test").Attribute([]byte("foo"), []byte("bar")))
+	require.Len(child.GetEvents(), 1, "child event should be stored")
+	require.Len(ctx.GetEvents(), 0, "child event should not immediately propagate")
+	events := child.GetEvents()
+
+	tree = child.State()
+	err = tree.Insert(ctx, []byte("key"), []byte("value"))
+	require.NoError(err, "Insert")
+
+	child.Commit()
+	child.Close()
+	require.EqualValues(events, ctx.GetEvents(), "child events should propagate after Commit")
+
+	tree = ctx.State()
+	value, err = tree.Get(ctx, []byte("key"))
+	require.NoError(err, "Get")
+	require.EqualValues([]byte("value"), value, "state updates should propagate after Commit")
+}

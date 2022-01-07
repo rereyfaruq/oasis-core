@@ -62,9 +62,11 @@ type Context struct { // nolint: maligned
 
 	parent *Context
 
-	mode               ContextMode
-	currentTime        time.Time
+	mode        ContextMode
+	currentTime time.Time
+
 	isMessageExecution bool
+	isTransaction      bool
 
 	data          interface{}
 	events        []types.Event
@@ -136,8 +138,17 @@ func (c *Context) Close() {
 		}
 	default:
 		// This is a child context.
-		if !c.IsSimulation() {
-			c.parent.events = append(c.parent.events, c.events...)
+		switch c.isTransaction {
+		case true:
+			// Transaction mode requires explicit commit, just make sure to cleanup the checkpoint.
+			if c.stateCheckpoint != nil {
+				c.stateCheckpoint.Close()
+			}
+		case false:
+			// Non-transaction mode.
+			if !c.IsSimulation() {
+				c.parent.events = append(c.parent.events, c.events...)
+			}
 		}
 	}
 
@@ -218,6 +229,35 @@ func (c *Context) NewChild() *Context {
 	}
 	cc.Context = context.WithValue(c.Context, contextKey{}, cc)
 	return cc
+}
+
+// NewTransaction creates a new transaction child context.
+//
+// This automatically starts a new state checkpoint and the context must be explicitly committed by
+// calling Commit otherwise both state and events will be reverted.
+//
+// NOTE: This does NOT isolate anything other than state and events.
+func (c *Context) NewTransaction() *Context {
+	cc := c.NewChild()
+	cc.isTransaction = true
+	// Start a checkpoint that will be committed by calling Commit.
+	_ = cc.StartCheckpoint()
+	return cc
+}
+
+// Commit commits state updates and emitted events in this transaction child context previously
+// created via NewTransaction.
+//
+// If this is not a transaction child context, the method has no effect.
+func (c *Context) Commit() {
+	if !c.isTransaction {
+		return
+	}
+
+	// Commit state and events.
+	c.stateCheckpoint.Commit()
+	// NOTE: Since isTransaction is true, we know c.parent is non-nil.
+	c.parent.events = append(c.parent.events, c.events...)
 }
 
 // WithCallerAddress creates a child context and sets a specific tx address.
